@@ -42,8 +42,9 @@ const startApp = async () => {
       await duoClient.healthCheck();
 
       const state = duoClient.generateState();
-      req.session.duo = { state, username };
-      const url = await duoClient.createAuthUrl(username, state);
+      const nonce = duoClient.generateNonce();
+      req.session.duo = { state, username, nonce };
+      const url = await duoClient.createAuthUrl(username, state, { nonce });
 
       res.redirect(302, url);
     } catch (err) {
@@ -68,6 +69,7 @@ const startApp = async () => {
 
     const savedState = session.duo?.state;
     const savedUsername = session.duo?.username;
+    const savedNonce = session.duo?.nonce;
 
     req.session.destroy();
 
@@ -87,9 +89,11 @@ const startApp = async () => {
     }
 
     try {
+      // Passing the saved nonce makes the SDK reject a token whose nonce claim doesn't match
       const decodedToken = await duoClient.exchangeAuthorizationCodeFor2FAResult(
         duo_code,
-        savedUsername
+        savedUsername,
+        savedNonce
       );
       res.render('success.html', { message: JSON.stringify(decodedToken, null, '\t') });
     } catch (err) {
