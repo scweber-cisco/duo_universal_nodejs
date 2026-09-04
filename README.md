@@ -83,6 +83,26 @@ Exchanges received `duo code` from callback redirect for token result.
 const token = await client.exchangeAuthorizationCodeFor2FAResult('duoCode', 'username');
 ```
 
+### Optional: nonce
+
+A nonce binds the authentication request to the resulting token. Generate one alongside the state,
+store it with the state, and pass it to both calls — the returned token is then rejected unless its
+`nonce` claim matches.
+
+```ts
+const state = client.generateState();
+const nonce = client.generateNonce();
+/* Store both against the user's session before redirecting. */
+
+const authUrl = await client.createAuthUrl('username', state, { nonce });
+
+/* On callback, after confirming the returned state matches the stored one: */
+const token = await client.exchangeAuthorizationCodeFor2FAResult('duoCode', 'username', nonce);
+```
+
+A supplied nonce must be between `MIN_NONCE_LENGTH` (16) and `MAX_NONCE_LENGTH` (1024) characters,
+otherwise a `DuoException` is thrown. Omit `nonce` entirely to leave the claim out of the request.
+
 ## Example
 
 A complete implementation example can be found in [`example/`](/example).

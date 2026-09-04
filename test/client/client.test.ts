@@ -84,6 +84,21 @@ describe('Client instance', () => {
     expect(typeof state).toBe('string');
     expect(state.length).toBe(constants.DEFAULT_STATE_LENGTH);
   });
+
+  it('should generate nonce of correct length', () => {
+    const client = new Client(clientOps);
+
+    const nonce = client.generateNonce();
+
+    expect(typeof nonce).toBe('string');
+    expect(nonce.length).toBe(constants.DEFAULT_NONCE_LENGTH);
+  });
+
+  it('should generate a different nonce on each call', () => {
+    const client = new Client(clientOps);
+
+    expect(client.generateNonce()).not.toBe(client.generateNonce());
+  });
 });
 
 describe('User Agent', () => {

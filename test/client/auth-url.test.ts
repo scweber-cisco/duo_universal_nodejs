@@ -16,6 +16,19 @@ const clientOps = {
 };
 const username = 'username';
 
+/* Pull the signed `request` JWT out of an authorization URL and return its verified payload. */
+const getRequestPayload = async (authUrl: string) => {
+  const request = new URL(authUrl).searchParams.get('request');
+  if (!request) throw new Error('authorization URL is missing the request parameter');
+
+  const secret = new TextEncoder().encode(clientOps.clientSecret);
+  const { payload } = await jwtVerify(request, secret, {
+    algorithms: [constants.SIG_ALGORITHM],
+  });
+
+  return payload;
+};
+
 describe('Authentication URL', () => {
   it('should throw if state is short for authentication URL', async () => {
     const client = new Client(clientOps);
@@ -105,6 +118,70 @@ describe('Authentication URL', () => {
     if (request) {
       const token = await jwtVerify(request, secret, { algorithms: [constants.SIG_ALGORITHM] });
       expect(token.payload.use_duo_code_attribute).toBe(false);
+    }
+  });
+
+  it('should omit the nonce claim when no nonce is supplied', async () => {
+    expect.assertions(1);
+
+    const client = new Client(clientOps);
+    const state = client.generateState();
+
+    const request = await getRequestPayload(await client.createAuthUrl(username, state));
+
+    expect(request).not.toHaveProperty('nonce');
+  });
+
+  it('should include the supplied nonce in the request JWT', async () => {
+    expect.assertions(1);
+
+    const client = new Client(clientOps);
+    const state = client.generateState();
+    const nonce = client.generateNonce();
+
+    const request = await getRequestPayload(await client.createAuthUrl(username, state, { nonce }));
+
+    expect(request.nonce).toBe(nonce);
+  });
+
+  it('should throw if nonce is short for authentication URL', async () => {
+    expect.assertions(2);
+
+    const client = new Client(clientOps);
+    const nonce = util.generateRandomString(constants.MIN_NONCE_LENGTH - 1);
+
+    try {
+      await client.createAuthUrl(username, client.generateState(), { nonce });
+    } catch (err: any) {
+      expect(err).toBeInstanceOf(DuoException);
+      expect(err.message).toBe(constants.DUO_NONCE_ERROR);
+    }
+  });
+
+  it('should throw if nonce is long for authentication URL', async () => {
+    expect.assertions(2);
+
+    const client = new Client(clientOps);
+    const nonce = util.generateRandomString(constants.MAX_NONCE_LENGTH + 1);
+
+    try {
+      await client.createAuthUrl(username, client.generateState(), { nonce });
+    } catch (err: any) {
+      expect(err).toBeInstanceOf(DuoException);
+      expect(err.message).toBe(constants.DUO_NONCE_ERROR);
+    }
+  });
+
+  it('should throw if nonce is an empty string for authentication URL', async () => {
+    expect.assertions(2);
+
+    const client = new Client(clientOps);
+
+    try {
+      await client.createAuthUrl(username, client.generateState(), { nonce: '' });
+    } catch (err: any) {
+      expect(err).toBeInstanceOf(DuoException);
+      expect(err.message).toBe(constants.DUO_NONCE_ERROR);
     }
   });
 });

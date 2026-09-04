@@ -134,6 +134,27 @@ describe('Token Exchange', () => {
     }
   });
 
+  it('should accept the nonce round-tripped through createAuthUrl', async () => {
+    expect.assertions(2);
+
+    const authNonce = client.generateNonce();
+    const authUrl = await client.createAuthUrl(username, client.generateState(), {
+      nonce: authNonce,
+    });
+
+    /* Duo echoes the request JWT's nonce back in the id_token; assert we sent what we verify. */
+    const request = new globalThis.URL(authUrl).searchParams.get('request');
+    expect(decodeJwt(request as string).nonce).toBe(authNonce);
+
+    const token = await createIdToken(null, { nonce: authNonce });
+    const data = await createTokenResult(token);
+    vi.spyOn(axios, 'post').mockResolvedValue({ data });
+
+    const result = await client.exchangeAuthorizationCodeFor2FAResult(code, username, authNonce);
+
+    expect(result).toEqual(decodeJwt(token));
+  });
+
   it('should thrown when token has missing properties', async () => {
     expect.assertions(2);
 
