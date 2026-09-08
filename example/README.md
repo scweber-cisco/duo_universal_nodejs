@@ -26,7 +26,3 @@ pnpm start
 3. Navigate to http://localhost:3000
 
 4. Log in with enrolled Duo user (any password will work, example doesn't verify first authentication step)
-
-The example generates both a `state` and a `nonce`, stores them in the session, and passes the nonce
-to `createAuthUrl` and `exchangeAuthorizationCodeFor2FAResult` — so a token whose `nonce` claim
-doesn't match the one we sent is rejected.
