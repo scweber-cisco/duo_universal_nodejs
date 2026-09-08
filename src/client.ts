@@ -19,6 +19,14 @@ import {
 } from './http';
 import { generateRandomString, getTimeInSeconds } from './util';
 
+export type AuthUrlOptions = {
+  /**
+   * Cryptographically random string echoed back in the id_token as the `nonce` claim. Pass the
+   * same value to exchangeAuthorizationCodeFor2FAResult to have it verified.
+   */
+  nonce?: string;
+};
+
 export type ClientOptions = {
   clientId: string;
   clientSecret: string;
@@ -204,6 +212,16 @@ export class Client {
   }
 
   /**
+   * Generate a random hex string with a length of DEFAULT_NONCE_LENGTH.
+   *
+   * @returns {string}
+   * @memberof Client
+   */
+  generateNonce(): string {
+    return generateRandomString(constants.DEFAULT_NONCE_LENGTH);
+  }
+
+  /**
    * Makes a call to HEALTH_CHECK_ENDPOINT to see if Duo is available.
    *
    * @returns {Promise<HealthCheckResponse>}
@@ -237,10 +255,15 @@ export class Client {
    *
    * @param {string} username
    * @param {string} state
+   * @param {AuthUrlOptions} [options={}]
    * @returns {string}
    * @memberof Client
    */
-  async createAuthUrl(username: string, state: string): Promise<string> {
+  async createAuthUrl(
+    username: string,
+    state: string,
+    options: AuthUrlOptions = {},
+  ): Promise<string> {
     if (!username) throw new DuoException(constants.DUO_USERNAME_ERROR);
 
     if (
@@ -249,6 +272,14 @@ export class Client {
       state.length > constants.MAX_STATE_LENGTH
     )
       throw new DuoException(constants.DUO_STATE_ERROR);
+
+    const { nonce } = options;
+
+    if (
+      nonce !== undefined &&
+      (nonce.length < constants.MIN_NONCE_LENGTH || nonce.length > constants.MAX_NONCE_LENGTH)
+    )
+      throw new DuoException(constants.DUO_NONCE_ERROR);
 
     const timeInSecs = getTimeInSeconds();
 
@@ -263,6 +294,7 @@ export class Client {
       iss: this.clientId,
       aud: this.baseURL,
       use_duo_code_attribute: this.useDuoCodeAttribute,
+      ...(nonce !== undefined ? { nonce } : {}),
     };
 
     const request = await new SignJWT(payload)
